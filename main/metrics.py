@@ -22,3 +22,94 @@ def _validate_labels(y_true, y_pred):
         raise ValueError("Metric update received an empty chunk.")
 
     return y_true, y_pred
+
+def safe_divide(numerator, denominator):
+    """
+    Safely divide two numbers.
+
+    Returns 0.0 when the denominator is zero.
+    """
+    if denominator == 0:
+        return 0.0
+    return numerator / denominator
+
+
+class StreamingAccuracy:
+    """
+    Streaming accuracy metric.
+
+    Accuracy = correct predictions / total predictions.
+    """
+
+    def __init__(self):
+        self.reset()
+
+    def update(self, y_true, y_pred):
+        """
+        Update accuracy using a new chunk.
+        """
+        y_true, y_pred = _validate_labels(y_true, y_pred)
+
+        self.correct += int(np.sum(y_true == y_pred))
+        self.total += int(y_true.shape[0])
+
+        return self
+
+    def result(self):
+        """
+        Return current cumulative accuracy.
+        """
+        return safe_divide(self.correct, self.total)
+
+    def reset(self):
+        """
+        Reset stored metric state.
+        """
+        self.correct = 0
+        self.total = 0
+        return self
+
+
+class StreamingPrecision:
+    """
+    Streaming precision metric.
+
+    For binary classification:
+
+    Precision = TP / (TP + FP)
+
+    By default, positive_label=1.
+    """
+
+    def __init__(self, positive_label=1):
+        self.positive_label = positive_label
+        self.reset()
+
+    def update(self, y_true, y_pred):
+        """
+        Update precision using a new chunk.
+        """
+        y_true, y_pred = _validate_labels(y_true, y_pred)
+
+        positive_predictions = y_pred == self.positive_label
+        true_positive = (y_true == self.positive_label) & positive_predictions
+        false_positive = (y_true != self.positive_label) & positive_predictions
+
+        self.tp += int(np.sum(true_positive))
+        self.fp += int(np.sum(false_positive))
+
+        return self
+
+    def result(self):
+        """
+        Return current cumulative precision.
+        """
+        return safe_divide(self.tp, self.tp + self.fp)
+
+    def reset(self):
+        """
+        Reset stored metric state.
+        """
+        self.tp = 0
+        self.fp = 0
+        return self
