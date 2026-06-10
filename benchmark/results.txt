@@ -3,8 +3,8 @@ Benchmark Results
 
 Model: Decision Tree
 Chunks: 6
-Total fit time: 0.029215 seconds
-Average chunk fit time: 0.004811 seconds
+Total fit time: 0.029524 seconds
+Average chunk fit time: 0.004885 seconds
 Average score time: 0.000017 seconds
 Prediction time latest chunk: 0.000013 seconds
 Final cumulative accuracy: 0.9545
@@ -13,10 +13,10 @@ Average memory bytes: 293.33
 
 Model: Random Forest
 Chunks: 6
-Total fit time: 0.044438 seconds
-Average chunk fit time: 0.007271 seconds
-Average score time: 0.000121 seconds
-Prediction time latest chunk: 0.000082 seconds
+Total fit time: 0.044044 seconds
+Average chunk fit time: 0.007205 seconds
+Average score time: 0.000122 seconds
+Prediction time latest chunk: 0.000083 seconds
 Final cumulative accuracy: 0.9091
 Latest chunk accuracy: 1.0000
 Average memory bytes: 293.33
