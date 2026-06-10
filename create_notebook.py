@@ -1,0 +1,355 @@
+import json
+import os
+
+
+notebook = {
+    "cells": [
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "# NumCompute Stream Demo\n",
+                "\n",
+                "This notebook demonstrates the streaming machine learning framework built using only Python, NumPy, and matplotlib.\n",
+                "\n",
+                "The demo performs the following steps:\n",
+                "\n",
+                "1. Loads a CSV dataset using the custom `io.py` module.\n",
+                "2. Splits the dataset into chunks to simulate streaming data.\n",
+                "3. Trains a Decision Tree pipeline incrementally.\n",
+                "4. Trains a Random Forest pipeline incrementally.\n",
+                "5. Logs accuracy, error, memory usage, and cumulative accuracy.\n",
+                "6. Visualises model performance over time.\n"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "import os\n",
+                "import sys\n",
+                "\n",
+                "# Add project root to Python path\n",
+                "sys.path.insert(0, os.path.abspath('..'))\n",
+                "\n",
+                "import numpy as np\n",
+                "\n",
+                "from numcompute_stream.io import load_csv, make_chunks\n",
+                "from numcompute_stream.preprocessing import SimpleImputer, StandardScaler\n",
+                "from numcompute_stream.tree import DecisionTreeClassifier\n",
+                "from numcompute_stream.ensemble import RandomForestClassifier\n",
+                "from numcompute_stream.pipeline import Pipeline\n",
+                "from numcompute_stream.stream import StreamTrainer\n",
+                "from numcompute_stream.visualise import (\n",
+                "    plot_metric_over_time,\n",
+                "    compare_models,\n",
+                "    plot_predictions_vs_ground_truth,\n",
+                "    plot_error_over_time,\n",
+                "    plot_memory_usage,\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 1. Load Dataset\n",
+                "\n",
+                "The dataset is loaded using the custom CSV loader from `io.py`. No pandas or external data-processing libraries are used."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "dataset_path = 'sample_dataset.csv'\n",
+                "\n",
+                "X, y = load_csv(dataset_path, target_column=-1, skip_header=True)\n",
+                "\n",
+                "print('X shape:', X.shape)\n",
+                "print('y shape:', y.shape)\n",
+                "print('First 5 rows of X:')\n",
+                "print(X[:5])\n",
+                "print('First 5 labels:')\n",
+                "print(y[:5])\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 2. Create Streaming Chunks\n",
+                "\n",
+                "The dataset is split into chunks to simulate a real-time streaming learning scenario."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "chunks = make_chunks(X, y, chunk_size=8)\n",
+                "print('Number of chunks:', len(chunks))\n",
+                "\n",
+                "for i, (X_chunk, y_chunk) in enumerate(chunks):\n",
+                "    print(f'Chunk {i}: X={X_chunk.shape}, y={y_chunk.shape}')\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 3. Build Streaming Pipelines\n",
+                "\n",
+                "Two pipelines are created:\n",
+                "\n",
+                "- A single Decision Tree pipeline\n",
+                "- A Random Forest ensemble pipeline\n",
+                "\n",
+                "Both use a `SimpleImputer` and `StandardScaler` before the model."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "tree_pipeline = Pipeline([\n",
+                "    ('imputer', SimpleImputer()),\n",
+                "    ('scaler', StandardScaler()),\n",
+                "    ('model', DecisionTreeClassifier(\n",
+                "        max_depth=4,\n",
+                "        min_samples_split=2,\n",
+                "        criterion='gini'\n",
+                "    )),\n",
+                "])\n",
+                "\n",
+                "forest_pipeline = Pipeline([\n",
+                "    ('imputer', SimpleImputer()),\n",
+                "    ('scaler', StandardScaler()),\n",
+                "    ('model', RandomForestClassifier(\n",
+                "        n_estimators=7,\n",
+                "        max_depth=4,\n",
+                "        min_samples_split=2,\n",
+                "        criterion='gini',\n",
+                "        random_state=42\n",
+                "    )),\n",
+                "])\n",
+                "\n",
+                "tree_trainer = StreamTrainer(tree_pipeline, verbose=True)\n",
+                "forest_trainer = StreamTrainer(forest_pipeline, verbose=True)\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 4. Train Decision Tree Incrementally\n",
+                "\n",
+                "Each chunk is passed to `.fit_chunk()`, which internally calls `.partial_fit()`."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "for X_chunk, y_chunk in chunks:\n",
+                "    tree_trainer.fit_chunk(X_chunk, y_chunk)\n",
+                "\n",
+                "tree_logs = tree_trainer.get_logs()\n",
+                "tree_logs\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 5. Train Random Forest Incrementally\n",
+                "\n",
+                "The Random Forest is trained in the same streaming way. It uses multiple decision trees and majority voting."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "for X_chunk, y_chunk in chunks:\n",
+                "    forest_trainer.fit_chunk(X_chunk, y_chunk)\n",
+                "\n",
+                "forest_logs = forest_trainer.get_logs()\n",
+                "forest_logs\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 6. Final Accuracy Results"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "print('Decision Tree final cumulative accuracy:', tree_logs['cumulative_accuracy'][-1])\n",
+                "print('Random Forest final cumulative accuracy:', forest_logs['cumulative_accuracy'][-1])\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 7. Visualise Accuracy Over Time"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "plot_metric_over_time(\n",
+                "    tree_logs['accuracy'],\n",
+                "    title='Decision Tree Accuracy Over Streaming Chunks',\n",
+                "    ylabel='Accuracy'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "plot_metric_over_time(\n",
+                "    forest_logs['accuracy'],\n",
+                "    title='Random Forest Accuracy Over Streaming Chunks',\n",
+                "    ylabel='Accuracy'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 8. Compare Models"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "compare_models(\n",
+                "    tree_logs['accuracy'],\n",
+                "    forest_logs['accuracy'],\n",
+                "    labels=('Decision Tree', 'Random Forest'),\n",
+                "    title='Streaming Accuracy Comparison',\n",
+                "    ylabel='Accuracy'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 9. Plot Error and Memory Usage"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "plot_error_over_time(\n",
+                "    forest_logs['error'],\n",
+                "    title='Random Forest Error Over Streaming Chunks'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "plot_memory_usage(\n",
+                "    forest_logs['memory_bytes'],\n",
+                "    title='Random Forest Memory Footprint Per Chunk'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 10. Predictions vs Ground Truth\n",
+                "\n",
+                "The final chunk is used to compare predicted labels against actual labels."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "latest_X, latest_y = chunks[-1]\n",
+                "latest_pred = forest_trainer.predict(latest_X)\n",
+                "\n",
+                "print('Ground truth:', latest_y.astype(int))\n",
+                "print('Predictions :', latest_pred.astype(int))\n",
+                "\n",
+                "plot_predictions_vs_ground_truth(\n",
+                "    latest_y,\n",
+                "    latest_pred,\n",
+                "    title='Latest Chunk: Predictions vs Ground Truth'\n",
+                ")\n"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Summary\n",
+                "\n",
+                "This notebook demonstrates that the NumCompute Stream framework supports chunk-wise data processing, incremental model updates, streaming metrics, model comparison, and visualisation using only NumPy and matplotlib."
+            ]
+        }
+    ],
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "name": "python",
+            "version": "3.12"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 5
+}
+
+
+os.makedirs("demo", exist_ok=True)
+
+with open("demo/stream_demo.ipynb", "w") as file:
+    json.dump(notebook, file, indent=2)
+
+print("Created demo/stream_demo.ipynb")
