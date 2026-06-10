@@ -1,14 +1,55 @@
 """
+io.py
+
 Custom input/output utilities for the NumCompute streaming framework.
+
+This module avoids external data-processing libraries such as pandas.
+It provides simple CSV loading, train-test splitting, and chunk creation
+for streaming machine learning experiments.
 """
 
 import csv
 import numpy as np
 
 
-def load_csv(path, target_column=-1, skip_header=True, dtype=float):
+def _convert_cell(value):
+    """
+    Convert a CSV cell to float.
+
+    Empty cells are converted to np.nan so that SimpleImputer can handle them.
+    """
+    value = value.strip()
+
+    if value == "":
+        return np.nan
+
+    return float(value)
+
+
+def load_csv(path, target_column=-1, skip_header=True):
     """
     Load a CSV file into NumPy arrays.
+
+    Empty cells are treated as np.nan.
+
+    Parameters
+    ----------
+    path : str
+        Path to the CSV file.
+
+    target_column : int, default=-1
+        Index of the target column.
+
+    skip_header : bool, default=True
+        Whether to skip the first row.
+
+    Returns
+    -------
+    X : np.ndarray
+        Feature matrix with shape (n_samples, n_features).
+
+    y : np.ndarray
+        Target vector with shape (n_samples,).
     """
     rows = []
 
@@ -21,12 +62,14 @@ def load_csv(path, target_column=-1, skip_header=True, dtype=float):
         for row in reader:
             if len(row) == 0:
                 continue
-            rows.append(row)
+
+            converted_row = [_convert_cell(cell) for cell in row]
+            rows.append(converted_row)
 
     if len(rows) == 0:
         raise ValueError("CSV file is empty or contains no valid rows.")
 
-    data = np.array(rows, dtype=dtype)
+    data = np.array(rows, dtype=float)
 
     if target_column < 0:
         target_column = data.shape[1] + target_column
